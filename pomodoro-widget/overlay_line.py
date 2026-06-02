@@ -10,6 +10,24 @@ from typing import Optional
 from timer import Phase
 
 
+def get_active_screen_dimensions():
+    """
+    Récupère les dimensions de l'écran ACTIF où l'application est en cours d'exécution.
+    Cela évite les problèmes avec les sessions RDP et les écrans multiples.
+    
+    Returns:
+        tuple: (width, height) de l'écran actif
+    """
+    root = tk.Tk()
+    root.withdraw()  # Cacher la fenêtre temporaire
+    
+    width = root.winfo_screenwidth()
+    height = root.winfo_screenheight()
+    
+    root.destroy()
+    return width, height
+
+
 class LineOverlay:
     """
     Overlay en forme de ligne (barre fine) sur toute la largeur de l'écran
@@ -31,7 +49,9 @@ class LineOverlay:
         # Couleurs
         self.green_color = "#00C853"
         self.red_color = "#D50000"
-        self.bg_color = "black"  # Couleur transparente
+        # Utiliser une couleur presque noire pour éviter les problèmes avec la taskbar
+        # (le black pur peut causer des artefacts avec certaines configurations Windows)
+        self.bg_color = "#000001"  # Couleur transparente (presque noir)
         
         # Dimensions
         self.height = 8
@@ -42,12 +62,16 @@ class LineOverlay:
         if self.root is not None:
             return
         
+        # Récupérer les dimensions de l'écran ACTIF où l'application s'exécute
+        # Cela évite les problèmes avec les sessions RDP et les écrans multiples
+        screen_width, screen_height = get_active_screen_dimensions()
+        
         self.root = tk.Tk()
         self.root.overrideredirect(True)  # Pas de bordure
         
-        # Récupérer les dimensions de l'écran
-        self.width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        # Positionner la fenêtre sur l'écran ACTIF uniquement
+        # Largeur = largeur de l'écran ACTIF (pas tous les écrans combinés)
+        self.width = screen_width
         
         # Positionner la fenêtre
         if self.position == "top":
