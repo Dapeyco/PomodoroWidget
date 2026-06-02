@@ -4,7 +4,6 @@ Gère l'icône dynamique et le menu contextuel
 """
 
 import sys
-import threading
 from typing import Optional, Callable, Dict
 from enum import Enum
 
@@ -43,10 +42,6 @@ class SystrayIcon:
         
         # Icône
         self.icon: Optional[pystray.Icon] = None
-        
-        # Thread pour la mise à jour de l'icône
-        self._update_thread: Optional[threading.Thread] = None
-        self._stop_update = threading.Event()
         
         # Créer l'icône initiale
         self._create_icon()
@@ -101,33 +96,7 @@ class SystrayIcon:
         except Exception as e:
             print(f"Erreur lors de la mise à jour de l'icône: {e}")
     
-    def _icon_update_loop(self) -> None:
-        """
-        Boucle de mise à jour de l'icône (exécutée dans un thread séparé)
-        """
-        while not self._stop_update.is_set():
-            try:
-                # Récupérer la progression et la phase
-                if self.timer.is_active():
-                    progress = self.timer.get_progress()
-                    phase = self.timer.get_phase()
-                    
-                    # Mettre à jour l'icône via le thread principal
-                    self.icon._run_in_main_thread(
-                        self._update_icon_image, progress, phase
-                    )
-                else:
-                    # Timer arrêté, icône par défaut
-                    self.icon._run_in_main_thread(
-                        self._update_icon_image, 0.0, None
-                    )
-                
-                # Attendre un peu
-                import time
-                time.sleep(0.5)
-            except Exception as e:
-                print(f"Erreur dans la boucle de mise à jour: {e}")
-                break
+
     
     def start(self) -> None:
         """Démarre l'icône systray"""
@@ -143,13 +112,10 @@ class SystrayIcon:
         # Démarrer l'icône
         self.icon = pystray.Icon("PomodoroWidget", initial_icon, "Pomodoro Widget", menu)
         
-        # Démarrer la boucle de mise à jour dans un thread
-        self._stop_update.clear()
-        self._update_thread = threading.Thread(target=self._icon_update_loop, daemon=True)
-        self._update_thread.start()
-        
         # Démarrer la boucle principale de pystray
         # Note: On utilise run_detached pour ne pas bloquer
+        # La mise à jour de l'icône est désactivée pour éviter les problèmes de thread
+        # (pystray a des limitations avec les mises à jour fréquentes depuis des threads)
         self.icon.run_detached()
     
     def _create_menu(self) -> pystray.Menu:
@@ -282,14 +248,9 @@ class SystrayIcon:
     
     def stop(self) -> None:
         """Arrête l'icône systray"""
-        self._stop_update.set()
-        
         if self.icon is not None:
             self.icon.stop()
             self.icon = None
-        
-        if self._update_thread is not None:
-            self._update_thread.join(timeout=1)
     
     def update_config(self, config: Dict) -> None:
         """Met à jour la configuration"""
