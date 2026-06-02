@@ -3,6 +3,7 @@ Fenêtre de configuration pour PomodoroWidget
 Fenêtre tkinter standard pour modifier les paramètres
 """
 
+import sys
 import tkinter as tk
 from tkinter import ttk
 from typing import Optional, Callable, Dict
@@ -42,8 +43,12 @@ class SettingsWindow:
         
         self.root = tk.Tk()
         self.root.title("Paramètres - Pomodoro Widget")
-        self.root.geometry("400x300")
+        self.root.geometry("450x350")
         self.root.resizable(False, False)
+        
+        # Configurer la police par défaut pour toute la fenêtre
+        default_font = ("Segoe UI", 10) if sys.platform == 'win32' else ("Helvetica", 12)
+        self.root.option_add("*Font", default_font)
         
         # Initialiser les variables
         self.work_minutes_var = tk.StringVar(value=str(self.config.get("work_minutes", 25)))
@@ -71,28 +76,31 @@ class SettingsWindow:
         duration_frame = ttk.LabelFrame(main_frame, text="Durées (minutes)", padding="10")
         duration_frame.pack(fill="x", pady=5)
         
+        # Augmenter la taille de la police pour les labels importants
+        label_font = ("Segoe UI", 11) if sys.platform == 'win32' else ("Helvetica", 12)
+        
         # Durée de travail
         work_frame = ttk.Frame(duration_frame)
         work_frame.pack(fill="x", pady=2)
         
-        ttk.Label(work_frame, text="Travail:").pack(side="left")
-        work_entry = ttk.Entry(work_frame, textvariable=self.work_minutes_var, width=5)
+        ttk.Label(work_frame, text="Travail:", font=label_font).pack(side="left")
+        work_entry = ttk.Entry(work_frame, textvariable=self.work_minutes_var, width=5, font=label_font)
         work_entry.pack(side="left", padx=5)
         
         # Durée de pause
         break_frame = ttk.Frame(duration_frame)
         break_frame.pack(fill="x", pady=2)
         
-        ttk.Label(break_frame, text="Pause:").pack(side="left")
-        break_entry = ttk.Entry(break_frame, textvariable=self.break_minutes_var, width=5)
+        ttk.Label(break_frame, text="Pause:", font=label_font).pack(side="left")
+        break_entry = ttk.Entry(break_frame, textvariable=self.break_minutes_var, width=5, font=label_font)
         break_entry.pack(side="left", padx=5)
         
         # Boutons présets
         presets_frame = ttk.Frame(duration_frame)
         presets_frame.pack(fill="x", pady=5)
         
-        ttk.Button(presets_frame, text="25/5", command=lambda: self._set_preset(25, 5)).pack(side="left", padx=2)
-        ttk.Button(presets_frame, text="90/15", command=lambda: self._set_preset(90, 15)).pack(side="left", padx=2)
+        ttk.Button(presets_frame, text="25/5", command=lambda: self._set_preset(25, 5), padding=5).pack(side="left", padx=2)
+        ttk.Button(presets_frame, text="90/15", command=lambda: self._set_preset(90, 15), padding=5).pack(side="left", padx=2)
         
         # Section Mode d'affichage
         display_frame = ttk.LabelFrame(main_frame, text="Mode d'affichage", padding="10")

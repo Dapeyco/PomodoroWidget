@@ -154,13 +154,13 @@ class SystrayIcon:
                 "Position : Haut",
                 lambda: self._set_line_position("top"),
                 checked=lambda item: self.current_line_position == "top",
-                visible=lambda item: self.current_display_mode == "line"
+                visible=lambda item: self._is_line_mode()
             ),
             pystray.MenuItem(
                 "Position : Bas",
                 lambda: self._set_line_position("bottom"),
                 checked=lambda item: self.current_line_position == "bottom",
-                visible=lambda item: self.current_display_mode == "line"
+                visible=lambda item: self._is_line_mode()
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -201,6 +201,10 @@ class SystrayIcon:
         # Afficher le nouvel overlay si le timer est actif
         if self.timer.is_active():
             self._show_current_overlay()
+        
+        # Reconstruire le menu pour mettre à jour la visibilité des items
+        if self.icon is not None:
+            self.icon.menu = self._create_menu()
     
     def _set_line_position(self, position: str) -> None:
         """Change la position de la ligne"""
@@ -251,6 +255,10 @@ class SystrayIcon:
         if self.icon is not None:
             self.icon.stop()
             self.icon = None
+    
+    def _is_line_mode(self) -> bool:
+        """Retourne True si le mode actuel est 'line'"""
+        return self.current_display_mode == "line"
     
     def update_config(self, config: Dict) -> None:
         """Met à jour la configuration"""
