@@ -8,24 +8,7 @@ import tkinter as tk
 from typing import Optional
 
 from timer import Phase
-
-
-def get_active_screen_dimensions():
-    """
-    Récupère les dimensions de l'écran ACTIF où l'application est en cours d'exécution.
-    Cela évite les problèmes avec les sessions RDP et les écrans multiples.
-    
-    Returns:
-        tuple: (width, height) de l'écran actif
-    """
-    root = tk.Tk()
-    root.withdraw()  # Cacher la fenêtre temporaire
-    
-    width = root.winfo_screenwidth()
-    height = root.winfo_screenheight()
-    
-    root.destroy()
-    return width, height
+from screen_utils import get_primary_screen_dimensions
 
 
 class LineOverlay:
@@ -62,15 +45,15 @@ class LineOverlay:
         if self.root is not None:
             return
         
-        # Récupérer les dimensions de l'écran ACTIF où l'application s'exécute
-        # Cela évite les problèmes avec les sessions RDP et les écrans multiples
-        screen_width, screen_height = get_active_screen_dimensions()
+        # Récupérer les dimensions de l'ÉCRAN PRINCIPAL (pas l'écran actif)
+        # Cela résout les problèmes avec les sessions RDP et les écrans multiples
+        screen_width, screen_height = get_primary_screen_dimensions()
         
         self.root = tk.Tk()
         self.root.overrideredirect(True)  # Pas de bordure
         
-        # Positionner la fenêtre sur l'écran ACTIF uniquement
-        # Largeur = largeur de l'écran ACTIF (pas tous les écrans combinés)
+        # Positionner la fenêtre sur l'écran PRINCIPAL
+        # Largeur = largeur de l'écran principal
         self.width = screen_width
         
         # Positionner la fenêtre
@@ -190,7 +173,9 @@ class LineOverlay:
         if self.root is None:
             return
         
-        screen_height = self.root.winfo_screenheight()
+        # Utiliser la hauteur de l'écran principal pour éviter les problèmes RDP
+        _, screen_height = get_primary_screen_dimensions()
+        
         if position == "top":
             y_position = 0
         else:
