@@ -213,7 +213,10 @@ class SystrayIcon:
         
         # Mettre à jour l'overlay ligne
         if "line" in self.overlays:
-            self.overlays["line"].set_position(position)
+            overlay = self.overlays["line"]
+            # Utiliser after pour exécuter dans le thread principal Tkinter
+            if overlay.root is not None:
+                overlay.root.after(0, lambda: overlay.set_position(position))
     
     def _show_current_overlay(self) -> None:
         """Affiche l'overlay correspondant au mode actuel"""
@@ -234,8 +237,6 @@ class SystrayIcon:
     
     def _on_quit(self) -> None:
         """Quitte l'application"""
-        self._stop_update.set()
-        
         # Arrêter le timer
         self.timer.stop()
         

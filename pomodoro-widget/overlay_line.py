@@ -182,17 +182,25 @@ class LineOverlay:
         self.position = position
         
         if self.root is not None:
-            screen_height = self.root.winfo_screenheight()
-            if position == "top":
-                y_position = 0
-            else:
-                y_position = screen_height - self.height
-            
-            self.root.geometry(f"{self.width}x{self.height}+0+{y_position}")
-            
-            # Forcer à rester au-dessus
-            if sys.platform == 'win32':
-                self._force_topmost()
+            # Utiliser after pour s'assurer que winfo_screenheight est appelé dans le thread principal
+            self.root.after(0, self._update_position, position)
+    
+    def _update_position(self, position: str) -> None:
+        """Met à jour la position de la fenêtre (appelé dans le thread principal)"""
+        if self.root is None:
+            return
+        
+        screen_height = self.root.winfo_screenheight()
+        if position == "top":
+            y_position = 0
+        else:
+            y_position = screen_height - self.height
+        
+        self.root.geometry(f"{self.width}x{self.height}+0+{y_position}")
+        
+        # Forcer à rester au-dessus
+        if sys.platform == 'win32':
+            self._force_topmost()
     
     def show(self) -> None:
         """Affiche la fenêtre"""
