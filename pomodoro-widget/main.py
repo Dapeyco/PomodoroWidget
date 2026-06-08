@@ -54,6 +54,9 @@ class PomodoroApp:
         # Configurer les callbacks
         self._setup_callbacks()
         
+        # Callback pour les changements de configuration depuis le menu
+        self.systray.on_config_change = self._on_config_change
+        
         # État de l'application
         self.running = False
         self.root: Optional[tk.Tk] = None
@@ -118,6 +121,27 @@ class PomodoroApp:
             self.overlays["line"].set_position(self.config.get("line_position", "top"))
         
         print("Configuration enregistrée:", self.config)
+    
+    def _on_config_change(self, new_config: Dict) -> None:
+        """
+        Callback appelé lors d'un changement de configuration depuis le menu contextuel
+        """
+        # Mettre à jour la configuration
+        self.config.update(new_config)
+        
+        # Sauvegarder dans le fichier
+        save_config(self.config)
+        
+        # Mettre à jour le timer avec les nouvelles durées
+        self.timer.update_durations(
+            work_minutes=self.config.get("work_minutes", 25),
+            break_minutes=self.config.get("break_minutes", 5)
+        )
+        
+        # Mettre à jour l'icône systray
+        self.systray.update_config(self.config)
+        
+        print("Configuration modifiée depuis le menu:", self.config)
     
     def _on_settings_requested(self) -> None:
         """Callback appelé lorsque les paramètres sont demandés"""

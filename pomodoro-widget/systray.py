@@ -39,6 +39,7 @@ class SystrayIcon:
         # Callbacks pour les actions
         self.on_settings: Optional[Callable[[], None]] = None
         self.on_quit: Optional[Callable[[], None]] = None
+        self.on_config_change: Optional[Callable[[Dict], None]] = None
         
         # Icône
         self.icon: Optional[pystray.Icon] = None
@@ -120,6 +121,10 @@ class SystrayIcon:
     
     def _create_menu(self) -> pystray.Menu:
         """Crée le menu contextuel"""
+        # Récupérer les durées actuelles
+        work_minutes = self.config.get("work_minutes", 25)
+        break_minutes = self.config.get("break_minutes", 5)
+        
         return pystray.Menu(
             pystray.MenuItem(
                 "▶ Démarrer",
@@ -161,6 +166,57 @@ class SystrayIcon:
                 lambda: self._set_line_position("bottom"),
                 checked=lambda item: self.current_line_position == "bottom",
                 visible=lambda item: self._is_line_mode()
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                f"Travail : {work_minutes} min",
+                pystray.Menu(
+                    pystray.MenuItem(
+                        "10 min",
+                        lambda: self._set_work_duration(10)
+                    ),
+                    pystray.MenuItem(
+                        "25 min",
+                        lambda: self._set_work_duration(25)
+                    ),
+                    pystray.MenuItem(
+                        "50 min",
+                        lambda: self._set_work_duration(50)
+                    ),
+                    pystray.MenuItem(
+                        "90 min",
+                        lambda: self._set_work_duration(90)
+                    ),
+                    pystray.MenuItem(
+                        "Personnalisé...",
+                        lambda: self._on_settings()
+                    )
+                )
+            ),
+            pystray.MenuItem(
+                f"Pause : {break_minutes} min",
+                pystray.Menu(
+                    pystray.MenuItem(
+                        "5 min",
+                        lambda: self._set_break_duration(5)
+                    ),
+                    pystray.MenuItem(
+                        "10 min",
+                        lambda: self._set_break_duration(10)
+                    ),
+                    pystray.MenuItem(
+                        "15 min",
+                        lambda: self._set_break_duration(15)
+                    ),
+                    pystray.MenuItem(
+                        "20 min",
+                        lambda: self._set_break_duration(20)
+                    ),
+                    pystray.MenuItem(
+                        "Personnalisé...",
+                        lambda: self._on_settings()
+                    )
+                )
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -217,6 +273,24 @@ class SystrayIcon:
             # Utiliser after pour exécuter dans le thread principal Tkinter
             if overlay.root is not None:
                 overlay.root.after(0, lambda: overlay.set_position(position))
+    
+    def _set_work_duration(self, minutes: int) -> None:
+        """Change la durée de travail"""
+        self.config["work_minutes"] = minutes
+        if self.on_config_change:
+            self.on_config_change(self.config)
+        # Reconstruire le menu pour mettre à jour l'affichage
+        if self.icon is not None:
+            self.icon.menu = self._create_menu()
+    
+    def _set_break_duration(self, minutes: int) -> None:
+        """Change la durée de pause"""
+        self.config["break_minutes"] = minutes
+        if self.on_config_change:
+            self.on_config_change(self.config)
+        # Reconstruire le menu pour mettre à jour l'affichage
+        if self.icon is not None:
+            self.icon.menu = self._create_menu()
     
     def _show_current_overlay(self) -> None:
         """Affiche l'overlay correspondant au mode actuel"""
