@@ -5,8 +5,9 @@ Orchestre l'application complète
 
 import sys
 import threading
+import queue
 import tkinter as tk
-from typing import Dict
+from typing import Dict, Optional, Callable, Any
 
 from config import load_config, save_config
 from timer import PomodoroTimer, Phase
@@ -34,12 +35,15 @@ class PomodoroApp:
             break_minutes=self.config.get("break_minutes", 5)
         )
         
-        # Créer les overlays
+        # Créer les overlays (ne pas créer les fenêtres tkinter encore)
         self.overlays = {
             "line": LineOverlay(position=self.config.get("line_position", "top")),
             "circle": CircleOverlay(),
             "counter": CounterOverlay()
         }
+        
+        # File d'événements pour la communication entre threads
+        self.event_queue = queue.Queue()
         
         # Créer l'icône systray
         self.systray = SystrayIcon(self.timer, self.overlays, self.config)
@@ -50,8 +54,12 @@ class PomodoroApp:
         # Configurer les callbacks
         self._setup_callbacks()
         
+        # Callback pour les changements de configuration depuis le menu
+        self.systray.on_config_change = self._on_config_change
+        
         # État de l'application
         self.running = False
+        self.root: Optional[tk.Tk] = None
         self.main_thread: Optional[threading.Thread] = None
     
     def _setup_callbacks(self) -> None:
@@ -69,42 +77,13 @@ class PomodoroApp:
     def _on_timer_tick(self, progress: float, phase: Phase) -> None:
         """
         Callback appelé à chaque tick du timer
-        Met à jour l'overlay actuel
+        Met à jour l'overlay actuel via la file d'événements
         """
-        # Déterminer quel overlay est actif
-        display_mode = self.config.get("display_mode", "line")
-        
-        if display_mode in self.overlays:
-            overlay = self.overlays[display_mode]
-            time_str = self.timer.get_current_time_str()
-            
-            # Mettre à jour l'overlay via le thread principal tkinter
-            # Utiliser after pour la thread safety
-            def update_overlay():
-                try:
-                    if display_mode == "line":
-                        overlay.update(progress, phase)
-                    elif display_mode == "circle":
-                        overlay.update(progress, phase, time_str)
-                    elif display_mode == "counter":
-                        overlay.update(progress, phase, time_str)
-                except Exception as e:
-                    print(f"Erreur lors de la mise à jour de l'overlay: {e}")
-            
-            # Trouver une fenêtre tkinter existante pour utiliser after
-            for ov in self.overlays.values():
-                if ov.root is not None:
-                    ov.root.after(0, update_overlay)
-                    return
-            
-            # Si aucune fenêtre n'existe, créer une fenêtre temporaire
-            try:
-                temp_root = tk.Tk()
-                temp_root.withdraw()
-                temp_root.after(0, lambda: (update_overlay(), temp_root.destroy()))
-                temp_root.mainloop()
-            except:
-                update_overlay()
+        # Envoyer l'événement à la boucle principale tkinter
+        self.event_queue.put(('update_overlay', {
+            'progress': progress,
+            'phase': phase
+        }))
     
     def _on_phase_change(self, phase: Phase) -> None:
         """
@@ -113,7 +92,6 @@ class PomodoroApp:
         print(f"Changement de phase: {phase.name}")
         
         # Afficher une notification (optionnel)
-        # Pour l'instant, on se contente de logger
         if phase == Phase.WORK:
             print("Phase de travail démarrée")
         else:
@@ -144,10 +122,31 @@ class PomodoroApp:
         
         print("Configuration enregistrée:", self.config)
     
+    def _on_config_change(self, new_config: Dict) -> None:
+        """
+        Callback appelé lors d'un changement de configuration depuis le menu contextuel
+        """
+        # Mettre à jour la configuration
+        self.config.update(new_config)
+        
+        # Sauvegarder dans le fichier
+        save_config(self.config)
+        
+        # Mettre à jour le timer avec les nouvelles durées
+        self.timer.update_durations(
+            work_minutes=self.config.get("work_minutes", 25),
+            break_minutes=self.config.get("break_minutes", 5)
+        )
+        
+        # Mettre à jour l'icône systray
+        self.systray.update_config(self.config)
+        
+        print("Configuration modifiée depuis le menu:", self.config)
+    
     def _on_settings_requested(self) -> None:
         """Callback appelé lorsque les paramètres sont demandés"""
-        # Afficher la fenêtre de paramètres
-        self.settings_window.show()
+        # Envoyer l'événement pour afficher la fenêtre de paramètres
+        self.event_queue.put(('show_settings', {}))
     
     def _on_quit(self) -> None:
         """Callback appelé lors de la fermeture de l'application"""
@@ -171,6 +170,59 @@ class PomodoroApp:
         # Quitter
         sys.exit(0)
     
+    def _process_events(self) -> None:
+        """Traite les événements de la file dans le thread principal tkinter"""
+        try:
+            while not self.event_queue.empty():
+                event_type, data = self.event_queue.get_nowait()
+                
+                if event_type == 'update_overlay':
+                    self._process_overlay_update(data)
+                elif event_type == 'show_settings':
+                    self.settings_window.show()
+                elif event_type == 'create_overlay':
+                    self._create_overlay_window(data)
+        except queue.Empty:
+            pass
+        
+        # Rappeler cette fonction après un court délai
+        if self.root is not None:
+            self.root.after(100, self._process_events)
+    
+    def _process_overlay_update(self, data: Dict) -> None:
+        """Met à jour l'overlay avec les données reçues"""
+        try:
+            progress = data.get('progress', 0.0)
+            phase = data.get('phase', Phase.WORK)
+            display_mode = self.config.get("display_mode", "line")
+            
+            if display_mode in self.overlays:
+                overlay = self.overlays[display_mode]
+                time_str = self.timer.get_current_time_str()
+                
+                # Créer la fenêtre si elle n'existe pas encore
+                if overlay.root is None:
+                    overlay.create_window()
+                
+                # Mettre à jour l'overlay
+                if display_mode == "line":
+                    overlay.update(progress, phase)
+                elif display_mode == "circle":
+                    overlay.update(progress, phase, time_str)
+                elif display_mode == "counter":
+                    overlay.update(progress, phase, time_str)
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour de l'overlay: {e}")
+    
+    def _create_overlay_window(self, data: Dict) -> None:
+        """Crée la fenêtre de l'overlay si elle n'existe pas"""
+        display_mode = data.get('mode', self.config.get("display_mode", "line"))
+        if display_mode in self.overlays:
+            overlay = self.overlays[display_mode]
+            if overlay.root is None:
+                overlay.create_window()
+                overlay.show()
+    
     def start(self) -> None:
         """Démarre l'application"""
         self.running = True
@@ -181,14 +233,8 @@ class PomodoroApp:
         # Démarrer automatiquement si configuré
         if self.config.get("autostart", False):
             self.timer.start()
-            # Afficher l'overlay actuel
-            display_mode = self.config.get("display_mode", "line")
-            if display_mode in self.overlays:
-                self.overlays[display_mode].create_window()
-                self.overlays[display_mode].show()
         
-        # Créer une fenêtre tkinter principale pour gérer les events
-        # (nécessaire pour que les overlays tkinter fonctionnent)
+        # Créer la fenêtre tkinter principale (cachée)
         self._create_main_window()
         
         print("PomodoroWidget démarré")
@@ -196,18 +242,19 @@ class PomodoroApp:
     def _create_main_window(self) -> None:
         """Crée une fenêtre principale cachée pour gérer les events tkinter"""
         # Créer une fenêtre principale cachée
-        self.main_window = tk.Tk()
-        self.main_window.withdraw()
+        self.root = tk.Tk()
+        self.root.withdraw()
         
-        # Démarrer la boucle principale tkinter dans un thread
-        def run_mainloop():
-            try:
-                self.main_window.mainloop()
-            except Exception as e:
-                print(f"Erreur dans la boucle tkinter: {e}")
+        # Démarrer le traitement des événements
+        self._process_events()
         
-        self.main_thread = threading.Thread(target=run_mainloop, daemon=True)
-        self.main_thread.start()
+        # Démarrer la boucle principale tkinter
+        try:
+            self.root.mainloop()
+        except Exception as e:
+            print(f"Erreur dans la boucle tkinter: {e}")
+        finally:
+            self.running = False
 
 
 def main():
@@ -226,13 +273,6 @@ def main():
     
     try:
         app.start()
-        
-        # Garder le thread principal vivant
-        # L'application se termine via le callback de quit
-        while app.running:
-            import time
-            time.sleep(1)
-            
     except KeyboardInterrupt:
         print("Interruption par l'utilisateur")
         app._on_quit()

@@ -7,6 +7,7 @@ import tkinter as tk
 from typing import Optional, Tuple
 
 from timer import Phase
+from screen_utils import get_screen_center
 
 
 class CounterOverlay:
@@ -28,9 +29,10 @@ class CounterOverlay:
         self.width = 120
         self.height = 40
         
-        # Position
-        self.x = 100
-        self.y = 100
+        # Position - centré sur l'écran principal par défaut
+        screen_center_x, screen_center_y = get_screen_center()
+        self.x = screen_center_x - self.width // 2
+        self.y = screen_center_y - self.height // 2
         
         # État du drag
         self.drag_start: Optional[Tuple[int, int]] = None

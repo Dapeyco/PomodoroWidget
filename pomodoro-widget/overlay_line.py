@@ -8,6 +8,7 @@ import tkinter as tk
 from typing import Optional
 
 from timer import Phase
+from screen_utils import get_primary_screen_dimensions
 
 
 class LineOverlay:
@@ -31,7 +32,9 @@ class LineOverlay:
         # Couleurs
         self.green_color = "#00C853"
         self.red_color = "#D50000"
-        self.bg_color = "black"  # Couleur transparente
+        # Utiliser une couleur presque noire pour éviter les problèmes avec la taskbar
+        # (le black pur peut causer des artefacts avec certaines configurations Windows)
+        self.bg_color = "#000001"  # Couleur transparente (presque noir)
         
         # Dimensions
         self.height = 8
@@ -42,12 +45,16 @@ class LineOverlay:
         if self.root is not None:
             return
         
+        # Récupérer les dimensions de l'ÉCRAN PRINCIPAL (pas l'écran actif)
+        # Cela résout les problèmes avec les sessions RDP et les écrans multiples
+        screen_width, screen_height = get_primary_screen_dimensions()
+        
         self.root = tk.Tk()
         self.root.overrideredirect(True)  # Pas de bordure
         
-        # Récupérer les dimensions de l'écran
-        self.width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
+        # Positionner la fenêtre sur l'écran PRINCIPAL
+        # Largeur = largeur de l'écran principal
+        self.width = screen_width
         
         # Positionner la fenêtre
         if self.position == "top":
@@ -158,17 +165,27 @@ class LineOverlay:
         self.position = position
         
         if self.root is not None:
-            screen_height = self.root.winfo_screenheight()
-            if position == "top":
-                y_position = 0
-            else:
-                y_position = screen_height - self.height
-            
-            self.root.geometry(f"{self.width}x{self.height}+0+{y_position}")
-            
-            # Forcer à rester au-dessus
-            if sys.platform == 'win32':
-                self._force_topmost()
+            # Utiliser after pour s'assurer que winfo_screenheight est appelé dans le thread principal
+            self.root.after(0, self._update_position, position)
+    
+    def _update_position(self, position: str) -> None:
+        """Met à jour la position de la fenêtre (appelé dans le thread principal)"""
+        if self.root is None:
+            return
+        
+        # Utiliser la hauteur de l'écran principal pour éviter les problèmes RDP
+        _, screen_height = get_primary_screen_dimensions()
+        
+        if position == "top":
+            y_position = 0
+        else:
+            y_position = screen_height - self.height
+        
+        self.root.geometry(f"{self.width}x{self.height}+0+{y_position}")
+        
+        # Forcer à rester au-dessus
+        if sys.platform == 'win32':
+            self._force_topmost()
     
     def show(self) -> None:
         """Affiche la fenêtre"""
