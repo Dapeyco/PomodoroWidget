@@ -121,8 +121,8 @@ class SettingsWindow:
         pos_frame = ttk.Frame(position_frame)
         pos_frame.pack(fill="x")
         
-        ttk.Radiobutton(pos_frame, text="Haut", variable=self.line_position_var, value="top").pack(side="left", padx=5)
-        ttk.Radiobutton(pos_frame, text="Bas", variable=self.line_position_var, value="bottom").pack(side="left", padx=5)
+        ttk.Radiobutton(pos_frame, text="Haut", variable=self.line_position_var, value="bottom").pack(side="left", padx=5)
+        ttk.Radiobutton(pos_frame, text="Bas", variable=self.line_position_var, value="top").pack(side="left", padx=5)
         
         # Option de démarrage automatique
         autostart_frame = ttk.Frame(main_frame)

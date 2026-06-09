@@ -152,14 +152,14 @@ class SystrayIcon:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Position : Haut",
-                lambda: self._set_line_position("top"),
-                checked=lambda item: self.current_line_position == "top",
+                lambda: self._set_line_position("bottom"),
+                checked=lambda item: self.current_line_position == "bottom",
                 visible=lambda item: self._is_line_mode()
             ),
             pystray.MenuItem(
                 "Position : Bas",
-                lambda: self._set_line_position("bottom"),
-                checked=lambda item: self.current_line_position == "bottom",
+                lambda: self._set_line_position("top"),
+                checked=lambda item: self.current_line_position == "top",
                 visible=lambda item: self._is_line_mode()
             ),
             pystray.Menu.SEPARATOR,
